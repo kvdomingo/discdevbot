@@ -1,6 +1,7 @@
 on:
   push:
     branches: [ main ]
+    paths-ignore: [ 'helm/**/*' ]
 
 jobs:
   build-and-push:
