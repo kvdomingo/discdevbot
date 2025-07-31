@@ -1,24 +1,33 @@
 FROM python:3.12-alpine AS base
 
-FROM base AS build
+ENV UV_VERSION=0.8.4
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/root/.local/bin:${PATH}"
 
-ENV POETRY_VERSION=1.8.4
-ENV POETRY_HOME=/opt/poetry
-ENV PATH=${PATH}:${POETRY_HOME}/bin
+FROM base AS build
 
 WORKDIR /tmp
 
-COPY pyproject.toml poetry.lock ./
-
 SHELL [ "/bin/ash", "-euxo", "pipefail", "-c" ]
+RUN apk add --no-cache curl
 
-RUN apk add --no-cache curl && \
-    curl -sSL https://install.python-poetry.org | python - && \
-    poetry export -f requirements.txt --without-hashes --without dev -o requirements.txt
+ADD https://astral.sh/uv/${UV_VERSION}/install.sh install-uv.sh
+
+COPY pyproject.toml uv.lock ./
+
+RUN chmod +x /tmp/install-uv.sh && \
+    /tmp/install-uv.sh && \
+    uv export --format requirements.txt --no-dev --no-hashes --no-header --no-annotate --output-file /tmp/requirements.txt
+
+WORKDIR /app
+
+RUN python -m venv .venv && \
+    ./.venv/bin/pip install -r /tmp/requirements.txt
 
 FROM base AS prod
 
-WORKDIR /tmp
+WORKDIR /app
 
 COPY --from=build /tmp/requirements.txt requirements.txt
 
@@ -28,6 +37,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 WORKDIR /app
 
-COPY ./discdevbot ./discdevbot
+SHELL [ "/bin/ash", "-euxo", "pipefail", "-c" ]
 
-CMD [ "python", "-m", "discdevbot" ]
+COPY ./discdevbot ./discdevbot
+COPY --from=build /app/.venv ./.venv/
+
+CMD [ "/app/.venv/bin/python", "-m", "discdevbot" ]
