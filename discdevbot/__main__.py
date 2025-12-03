@@ -1,3 +1,4 @@
+from aiohttp.client_exceptions import ClientConnectorDNSError
 from discord import Client, Intents, Interaction, Object
 from discord.app_commands import CommandTree
 from loguru import logger
@@ -32,4 +33,8 @@ async def ping(interaction: Interaction):
     await interaction.response.send_message(f"Pong! ({bot.latency * 1000:.2f} ms)")
 
 
-bot.run(settings.DISCORD_TOKEN)
+try:
+    bot.run(settings.DISCORD_TOKEN)
+except ClientConnectorDNSError as e:
+    logger.exception(e)
+    logger.error(f"Error connecting to Discord: {e}")
